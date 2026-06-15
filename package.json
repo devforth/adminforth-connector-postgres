@@ -1,0 +1,63 @@
+{
+  "name": "@adminforth/connector-postgres",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "homepage": "https://adminforth.dev/docs/tutorial/Plugins/connector-postgres/",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "keywords": [
+    "adminforth",
+    "ai-agent",
+    "tool-calling",
+    "chat-ui",
+    "langgraph",
+    "llm",
+    "session-memory"
+  ],
+  "author": "DevForth (https://devforth.io)",
+  "license": "MIT",
+  "description": "AI agent plugin for AdminForth with tool-based workflows and persistent chat sessions",
+  "devDependencies": {
+    "@types/node": "latest",
+    "@types/pg": "^8.6.5",
+    "semantic-release": "^24.2.1",
+    "semantic-release-slack-bot": "^4.0.2",
+    "typescript": "^5.7.3"
+  },
+  "dependencies": {
+    "adminforth": "2.72.3",
+    "dayjs": "^1.11.21",
+    "pg": "^8.21.0"
+  },
+  "release": {
+    "plugins": [
+      "@semantic-release/commit-analyzer",
+      "@semantic-release/release-notes-generator",
+      "@semantic-release/npm",
+      "@semantic-release/github",
+      [
+        "semantic-release-slack-bot",
+        {
+          "packageName": "@adminforth/connector-postgres",
+          "notifyOnSuccess": true,
+          "notifyOnFail": true,
+          "slackIcon": ":package:",
+          "markdownReleaseNotes": true
+        }
+      ]
+    ]
+  },
+  "branches": [
+    "main",
+    {
+      "name": "next",
+      "prerelease": true
+    }
+  ]
+}
