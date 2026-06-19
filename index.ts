@@ -2,7 +2,7 @@ import dayjs from 'dayjs';
 import { AdminForthResource, IAdminForthSingleFilter, IAdminForthAndOrFilter, IAdminForthDataSourceConnector, AdminForthConfig, IAggregationRule, IGroupByRule, IGroupByDateTrunc, IGroupByField } from 'adminforth';
 import { AdminForthDataTypes, AdminForthFilterOperators, AdminForthSortDirections, AdminForthBaseConnector} from 'adminforth';
 import pkg from 'pg';
-import { afLogger, dbLogger } from 'adminforth';
+import { afLogger, dbLogger, checkIfFieldIsInsideResourceColumns } from 'adminforth';
 
 const { Pool } = pkg;
 const { Client, types } = pkg;
@@ -467,6 +467,10 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
         const tableName = resource.table;
 
         const { sql: where, paramsCount, values: filterValues } = this.whereClauseAndValues(resource, filters);
+
+                if (sort.some(s => !checkIfFieldIsInsideResourceColumns(s.field, resource))) {
+                    throw new Error(`Invalid sort field: ${sort.find(s => !checkIfFieldIsInsideResourceColumns(s.field, resource))?.field}`);
+                }
 
         const limitOffset = `LIMIT $${paramsCount} OFFSET $${paramsCount + 1}`;
         const d = [...filterValues, limit, offset];
