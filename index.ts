@@ -90,7 +90,19 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
         const sampleRow = sampleRowRes.rows[0] ?? {};
         return res.rows.map((row: { column_name: string }) => ({ name: row.column_name, sampleValue: sampleRow[row.column_name] }));
       }
-    
+
+    async isDatabaseEmpty(): Promise<boolean> {
+        const res = await this.client.query(`
+            SELECT table_schema, table_name
+            FROM information_schema.tables
+            WHERE table_type = 'BASE TABLE'
+              AND table_schema NOT IN ('pg_catalog', 'information_schema')
+              AND table_schema NOT LIKE 'pg_toast%'
+            LIMIT 1
+        `);
+        return res.rows.length === 0;
+    }
+
     async checkForeignResourceCascade(resource: AdminForthResource, config: AdminForthConfig, schema = 'public'): Promise<void> {
         const cascadeColumn = resource.columns.find(c => c.foreignResource?.onDelete === 'cascade');
         if (!cascadeColumn) return;
