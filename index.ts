@@ -1,5 +1,5 @@
 import dayjs from 'dayjs';
-import { AdminForthResource, IAdminForthSingleFilter, IAdminForthAndOrFilter, IAdminForthDataSourceConnector, AdminForthConfig, IAggregationRule, IGroupByRule, IGroupByDateTrunc, IGroupByField } from 'adminforth';
+import { AdminForthResource, IAdminForthSingleFilter, IAdminForthAndOrFilter, IAdminForthDataSourceConnector, AdminForthConfig, IAggregationRule, IGroupByRule, IGroupByDateTrunc, IGroupByField, AdminForthResourceColumn } from 'adminforth';
 import { AdminForthDataTypes, AdminForthFilterOperators, AdminForthSortDirections, AdminForthBaseConnector} from 'adminforth';
 import pkg from 'pg';
 import { afLogger, dbLogger, checkIfFieldIsInsideResourceColumns } from 'adminforth';
@@ -537,6 +537,13 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
     async createRecordOriginalValues({ resource, record }: { resource: AdminForthResource; record: Record<string, any> }): Promise<string> {
         const tableName = resource.table;
         const columns = Object.keys(record);
+
+        const knownColumns = new Set(resource.dataSourceColumns.map((col: AdminForthResourceColumn) => col.name));
+        const unknownColumn = columns.find((colName) => !knownColumns.has(colName));
+        if (unknownColumn) {
+            throw new Error(`Invalid column name: ${unknownColumn}`);
+        }
+
         const placeholders = columns.map((_, i) => `$${i + 1}`).join(', ');
         const values = columns.map((colName) => record[colName]);
         for (let i = 0; i < columns.length; i++) {
