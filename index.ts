@@ -532,7 +532,7 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
             };
         }))
         return result;
-    }
+    } 
 
     async createRecordOriginalValues({ resource, record }: { resource: AdminForthResource; record: Record<string, any> }): Promise<string> {
         const tableName = resource.table;
