@@ -17,7 +17,7 @@ type QueryRow = Record<string, any>;
 
 class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDataSourceConnector {
 
-    // connector builds WHERE clause from pkValues, so resources with composite primary key are supported
+    // connector builds WHERE clause from pkValues, so resources with composite primary key are supported 
     supportsCompositePrimaryKey = true;
 
     /**
@@ -217,7 +217,6 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
             } else if (normalizedBaseType == 'date') {
                 field.type = AdminForthDataTypes.DATE;
                 field._underlineType = 'timestamp';
-
             } else if (normalizedBaseType.includes('date') || normalizedBaseType.includes('time')) {
                 field.type = AdminForthDataTypes.DATETIME;
                 field._underlineType = 'timestamp';
