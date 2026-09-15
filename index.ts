@@ -17,6 +17,17 @@ type QueryRow = Record<string, any>;
 
 class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDataSourceConnector {
 
+    // connector builds WHERE clause from pkValues, so resources with composite primary key are supported
+    supportsCompositePrimaryKey = true;
+
+    /**
+     * Returns [column, value] pairs identifying single record.
+     * pkValues is passed by base connector, fallback keeps method usable when it is called directly.
+     */
+    pkEntries(resource: AdminForthResource, recordId: any, pkValues?: Record<string, any>): [string, any][] {
+        return Object.entries(pkValues ?? this.getPrimaryKeyValues(resource, recordId));
+    }
+
     async setupClient(url: string, options?: { recovery?: boolean }): Promise<void> {
         this.client = new Pool({
             connectionString: url
@@ -549,25 +560,34 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
         for (let i = 0; i < columns.length; i++) {
             columns[i] = `"${columns[i]}"`;
         }
-        const primaryKey = this.getPrimaryKey(resource);
-        const q = `INSERT INTO "${tableName}" (${columns.join(', ')}) VALUES (${placeholders}) RETURNING "${primaryKey}"`;
+        const primaryKeys = this.getPrimaryKeys(resource);
+        const returning = primaryKeys.map((pk) => `"${pk}"`).join(', ');
+        const q = `INSERT INTO "${tableName}" (${columns.join(', ')}) VALUES (${placeholders}) RETURNING ${returning}`;
         dbLogger.trace(`🪲📜 PG Q: ${q}, values: ${JSON.stringify(values)}`);
         const ret = await this.client.query(q, values);
-        return ret.rows[0][primaryKey];
+        // for composite primary key base connector builds record id from all returned key columns itself
+        return ret.rows[0][primaryKeys[0]];
     }
 
-    async updateRecordOriginalValues({ resource, recordId, newValues }: { resource: AdminForthResource; recordId: any; newValues: Record<string, any> }) {
-        const values = [...Object.values(newValues), recordId];
+    async updateRecordOriginalValues({ resource, recordId, newValues, pkValues }: { resource: AdminForthResource; recordId: any; newValues: Record<string, any>; pkValues?: Record<string, any> }) {
+        const pkEntries = this.pkEntries(resource, recordId, pkValues);
+        const values = [...Object.values(newValues), ...pkEntries.map(([, value]) => value)];
         const columnsWithPlaceholders = Object.keys(newValues).map((col, i) => `"${col}" = $${i + 1}`).join(', ');
-        const q = `UPDATE "${resource.table}" SET ${columnsWithPlaceholders} WHERE "${this.getPrimaryKey(resource)}" = $${values.length}`;
+        const whereClause = pkEntries
+            .map(([col], i) => `"${col}" = $${Object.keys(newValues).length + i + 1}`)
+            .join(' AND ');
+        const q = `UPDATE "${resource.table}" SET ${columnsWithPlaceholders} WHERE ${whereClause}`;
         dbLogger.trace(`🪲📜 PG Q: ${q}, values: ${JSON.stringify(values)}`);
         await this.client.query(q, values);
     }
 
-    async deleteRecord({ resource, recordId }: { resource: AdminForthResource; recordId: any }): Promise<boolean> {
-        const q = `DELETE FROM "${resource.table}" WHERE "${this.getPrimaryKey(resource)}" = $1`;
-        dbLogger.trace(`🪲📜 PG Q: ${q}, values: ${JSON.stringify([recordId])}`);
-        const res = await this.client.query(q, [recordId]);
+    async deleteRecord({ resource, recordId, pkValues }: { resource: AdminForthResource; recordId: any; pkValues?: Record<string, any> }): Promise<boolean> {
+        const pkEntries = this.pkEntries(resource, recordId, pkValues);
+        const whereClause = pkEntries.map(([col], i) => `"${col}" = $${i + 1}`).join(' AND ');
+        const values = pkEntries.map(([, value]) => value);
+        const q = `DELETE FROM "${resource.table}" WHERE ${whereClause}`;
+        dbLogger.trace(`🪲📜 PG Q: ${q}, values: ${JSON.stringify(values)}`);
+        const res = await this.client.query(q, values);
         return res.rowCount > 0;
     }
 
@@ -575,10 +595,17 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
         if (!recordIds || recordIds.length === 0) {
             return 0;
         }
-        const placeholders = recordIds.map((_, idx) => `$${idx + 1}`).join(', ');
-        const query = `DELETE FROM "${resource.table}" WHERE "${this.getPrimaryKey(resource)}" IN (${placeholders})`;
-        dbLogger.trace(`🪲📜 PG Q: ${query}, values: ${JSON.stringify([recordIds])}`);
-        const res = await this.client.query(query, recordIds);
+        // (pk1 = $1 AND pk2 = $2) OR (pk1 = $3 AND pk2 = $4) ... , which is just "pk IN (...)" for single primary key
+        const values: any[] = [];
+        const whereClause = recordIds.map((recordId) => {
+            const pkEntries = this.pkEntries(resource, recordId);
+            const condition = pkEntries.map(([col], i) => `"${col}" = $${values.length + i + 1}`).join(' AND ');
+            values.push(...pkEntries.map(([, value]) => value));
+            return `(${condition})`;
+        }).join(' OR ');
+        const query = `DELETE FROM "${resource.table}" WHERE ${whereClause}`;
+        dbLogger.trace(`🪲📜 PG Q: ${query}, values: ${JSON.stringify(values)}`);
+        const res = await this.client.query(query, values);
         return res.rowCount ?? 0;
     }
 
