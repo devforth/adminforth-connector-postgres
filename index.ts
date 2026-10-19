@@ -343,7 +343,7 @@ class PostgresConnector extends AdminForthBaseConnector implements IAdminForthDa
                 placeholder = `(${filter.value.map(() => placeholder).join(', ')})`;
             }
 
-            if (fieldData._underlineType == 'uuid' &&
+            if ((fieldData._underlineType == 'uuid' || fieldData._underlineType == 'json' || fieldData._isPgArray) &&
                 (filter.operator == AdminForthFilterOperators.ILIKE || filter.operator == AdminForthFilterOperators.LIKE)
             ) {
                 field = `cast("${field}" as text)`
